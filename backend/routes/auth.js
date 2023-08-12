@@ -8,7 +8,7 @@ const router = express.Router()
 const { body, validationResult } = require('express-validator')
 
 
-// Create a User using: POST  "/api/createUser/". Doesn't require Auth
+// Create a User using: POST  "/api/createUser/". No Login required
 router.post("/createUser", [
     body('name', 'Enter a valid name').isLength({ min: 3 }),
     body('email', 'Enter a valid email').isEmail(),
@@ -43,9 +43,39 @@ router.post("/createUser", [
 
     } catch (error) {
         console.log(error)
-        res.status(500).send("some error occurred")
+        res.status(500).send("Internal server Error")
     }
 
+})
+
+// Create a User using: POST  "/api/login/". No Login required
+router.post("/login", [
+    body('email', 'Enter a valid email').isEmail(),
+    body('password', 'Password cannot be empty').exists()
+], async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(401).json({ "error": errors.array() })
+
+    const { email, password } = req.body
+    try {
+        let user = await User.findOne({ email })
+        if (!user) return res.status(400).json({ "error": 'Please try to login with correct credentials' })
+        const passpwordCompare = await bcrypt.compare(password, user.password)
+        if (!(passpwordCompare)) return res.status(400).json({ "error": 'Please try to login with correct credentials' })
+
+        const data = {
+            user: {
+                id: user.id
+            }
+        }
+        const authToken = jwt.sign(data, process.env.SECRET_KEY)
+        // res.json({ "user": user })
+        res.json({ authToken })
+
+    } catch (error) {
+        console.log(error)
+        res.status(500).send("Internal server Error")
+    }
 })
 
 module.exports = router
